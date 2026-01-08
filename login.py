@@ -4,7 +4,7 @@ users_db = {
     "bob": "my_secret"
 }
 def login():
-    print("--- Login System ---")
+    print("----LOGGING IN USER-----")
     username = input("Enter Username: ")
     password = input("Enter Password: ")
     if username in users_db and users_db[username] == password:
