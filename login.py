@@ -1,5 +1,5 @@
 users_db = {
-    "admin": "password123",
+    "admin": "password8910",
     "alice": "secure789",
     "bob": "my_secret"
 }
