@@ -1,0 +1,505 @@
+Username and password id = creds
+Config file id = kuberconfig
+
+Html folder name = html-demo
+Simple java folder name = simple-java-app
+Java with junit test = java-math-app
+
+Maven-3 for installation in manage Jenkins -> tools
+
+HTML – CI AND CD
+
+Folder struture
+html-demo
+•	index.html
+•	Dockerfile
+•	Deployment.yaml
+
+Dockerfile
+FROM nginx:latest 
+COPY index.html /usr/share/nginx/html/index.html
+ EXPOSE 80
+
+deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: html-demo
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: html-demo
+  template:
+    metadata:
+      labels:
+        app: html-demo
+    spec:
+      containers:
+      - name: html-demo
+        image: palaksharmah/html-demo:latest   # <-- change this
+        ports:
+        - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: html-demo-service
+spec:
+  type: NodePort
+  selector:
+    app: html-demo
+  ports:
+  - port: 80
+    targetPort: 80
+    nodePort: 30010
+
+username and password with id : creds
+config file with id: kuberconfig
+
+pipeline script
+pipeline {
+    agent any
+
+    environment {
+        DOCKER_IMAGE = "palaksharmah /html-demo"
+    }
+
+    stages {
+        stage('Clone Code') {
+            steps {
+                git branch: 'main', url: 'https://github.com/yourusername/your-repo.git'
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                bat 'docker build -t %DOCKER_IMAGE% .'
+            }
+        }
+
+        stage('Push Image') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'creds', 
+                                                  usernameVariable: 'USER', 
+                                                  passwordVariable: 'PASS')]) {
+                    bat 'docker login -u %USER% -p %PASS%'
+                    bat 'docker push %DOCKER_IMAGE%'
+                }
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                withCredentials([file(credentialsId: 'kuberconfig', variable: 'KUBECONFIG')]) {
+                    bat '''
+                        set KUBECONFIG=%KUBECONFIG%
+                        kubectl apply -f deployment.yaml --validate=false
+                    '''
+                }
+            }
+        }
+    }
+}
+
+
+--------------------------------------------------------------------------------------------------------------------------------------
+Java 
+Folder structure
+
+simple-java-app/
+├── src/
+│   └── main/
+│       └── java/
+│           └── com/
+│               └── demo/
+│                   └── App.java
+├── pom.xml
+├── Dockerfile
+└── deployment.yaml
+
+pom.xml
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.demo</groupId>
+    <artifactId>simple-java-app</artifactId>
+    <version>1.0</version>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.10.1</version>
+                <configuration>
+                    <source>17</source>
+                    <target>17</target>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+
+Dockerfile
+FROM eclipse-temurin:17-jdk 
+WORKDIR /app 
+COPY target/simple-java-app-1.0.jar app.jar 
+CMD ["java", "-jar", "app.jar"]
+
+deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: java-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: java-app
+  template:
+    metadata:
+      labels:
+        app: java-app
+    spec:
+      containers:
+      - name: java-app
+        image: palaksharmah/java-app:latest   # CHANGE THIS
+        ports:
+        - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: java-service
+spec:
+  type: NodePort
+  selector:
+    app: java-app
+  ports:
+  - port: 80
+    targetPort: 8080
+    nodePort: 30008
+
+
+
+
+
+
+
+Pipeline script:
+pipeline {
+    agent any
+
+    environment {
+        DOCKER_IMAGE = "palaksharmah/java-app:latest"
+    }
+
+    stages {
+        stage('Clone Repository') {
+            steps {
+                git branch: 'main',
+                    url: 'https://github.com/your-reponame/simple-java-app.git'
+            }
+        }
+
+        stage('Build with Maven') {
+            steps {
+                bat 'mvn clean package'
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                bat "docker build -t %DOCKER_IMAGE% ."
+            }
+        }
+
+        stage('Push to DockerHub') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'creds',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    bat """
+                        docker login -u %DOCKER_USER% -p %DOCKER_PASS%
+                        docker push %DOCKER_IMAGE%
+                    """
+                }
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                withCredentials([file(credentialsId: 'kuberconfig', variable: 'KUBECONFIG')]) {
+                    bat """
+                        set KUBECONFIG=%KUBECONFIG%
+                        kubectl apply -f deployment.yaml --validate=false
+                    """
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'CI/CD Pipeline executed successfully!'
+        }
+        failure {
+            echo 'Pipeline failed. Please check logs.'
+        }
+    }
+}
+--------------------------------------------------------------------------------------------------------------------------------------
+Java with junit test:
+
+java-math-app/
+├── src/
+│   ├── main/
+│   │   └── java/
+│   │       └── com/
+│   │           └── example/
+│   │               ├── Calculator.java
+│   │               └── Main.java
+│   └── test/
+│       └── java/
+│           └── com/
+│               └── example/
+│                   └── CalculatorTest.java
+├── pom.xml
+├── Dockerfile
+├── deployment.yaml
+
+Pom.xml
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.example</groupId>
+    <artifactId>java-math-app</artifactId>
+    <version>1.0</version>
+
+    <properties>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.9.2</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.10.1</version>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.0.0-M9</version>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+
+src/main/java/com/example/Calculator.java
+
+package com.example;
+
+public class Calculator {
+    public int add(int a, int b) {
+        return a + b;
+    }
+
+    public int subtract(int a, int b) {
+        return a - b;
+    }
+
+    public int multiply(int a, int b) {
+        return a * b;
+    }
+
+    public int divide(int a, int b) {
+        if (b == 0) {
+            throw new IllegalArgumentException("Cannot divide by zero");
+        }
+        return a / b;
+    }
+}
+src/main/java/com/example/Main.java
+package com.example;
+
+public class Main {
+    public static void main(String[] args) {
+        Calculator calc = new Calculator();
+        System.out.println("10 + 5 = " + calc.add(10, 5));
+        System.out.println("10 - 5 = " + calc.subtract(10, 5));
+        System.out.println("10 * 5 = " + calc.multiply(10, 5));
+        System.out.println("10 / 5 = " + calc.divide(10, 5));
+    }
+}
+
+src/test/java/com/example/CalculatorTest.java
+package com.example;
+
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
+
+public class CalculatorTest {
+    private final Calculator calc = new Calculator();
+
+    @Test
+    public void testAdd() {
+        assertEquals(5, calc.add(2, 3));
+        assertEquals(0, calc.add(-1, 1));
+    }
+
+    @Test
+    public void testSubtract() {
+        assertEquals(1, calc.subtract(3, 2));
+        assertEquals(-2, calc.subtract(0, 2));
+    }
+
+    @Test
+    public void testMultiply() {
+        assertEquals(6, calc.multiply(2, 3));
+        assertEquals(0, calc.multiply(0, 5));
+    }
+
+    @Test
+    public void testDivide() {
+        assertEquals(2, calc.divide(6, 3));
+        assertThrows(IllegalArgumentException.class, () -> calc.divide(1, 0));
+    }
+}
+
+Dockerfile
+FROM eclipse-temurin:17-jdk
+WORKDIR /app
+COPY target/java-math-app-1.0.jar app.jar
+CMD ["java", "-cp", "app.jar", "com.example.Main"]
+
+deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: java-math-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: java-math-app
+  template:
+    metadata:
+      labels:
+        app: java-math-app
+    spec:
+      containers:
+      - name: java-math-app
+        image: yourdockerhubusername/java-math-app:latest   # CHANGE THIS
+        ports:
+        - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: java-math-service
+spec:
+  type: NodePort
+  selector:
+    app: java-math-app
+  ports:
+  - port: 80
+    targetPort: 8080
+    nodePort: 30008
+
+
+pipeline  script
+pipeline {
+    agent any
+
+    environment {
+        DOCKER_IMAGE = "palaksharmah/java-math-app:latest"
+    }
+
+    stages {
+        stage('Clone Repository') {
+            steps {
+                git branch: 'main',
+                    url: 'https://github.com/yourusername/java-math-app.git'
+            }
+        }
+
+        stage('Build with Maven') {
+            steps {
+                bat 'mvn clean compile'
+            }
+        }
+
+        stage('Run JUnit Tests') {
+            steps {
+                bat 'mvn test'
+            }
+        }
+
+        stage('Package JAR') {
+            steps {
+                bat 'mvn package -DskipTests'
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                bat "docker build -t %DOCKER_IMAGE% ."
+            }
+        }
+
+        stage('Push to DockerHub') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'creds',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    bat """
+                        docker login -u %DOCKER_USER% -p %DOCKER_PASS%
+                        docker push %DOCKER_IMAGE%
+                    """
+                }
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                withCredentials([file(credentialsId: 'kuberconfig', variable: 'KUBECONFIG')]) {
+                    bat """
+                        set KUBECONFIG=%KUBECONFIG%
+                        kubectl apply -f deployment.yaml --validate=false
+                    """
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'CI/CD Pipeline executed successfully!'
+        }
+        failure {
+            echo 'Pipeline failed. Check test results or build logs.'
+        }
+    }
+}
+
