@@ -1,0 +1,820 @@
+simple-maven-app/
+├── pom.xml
+└── src/
+ ├── main/java/com/example/App.java
+ └── test/java/com/example/AppTest.java
+
+
+App.java
+
+package com.example;
+
+public class Factorial{
+    public int fact(int n){
+        int f=1;
+        for(int i=1;i<=n;i++)
+            f=f*i;
+        return f;
+    }
+}
+
+AppTest.java
+
+
+import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test; 
+
+
+
+
+package com.example;
+import org.junit.Test;
+import static org.junit.Assert.*;
+
+public class AppTest
+{
+    @Test
+    public void testfact()
+    {
+        Factorial ob = new Factorial();
+        assertEquals(120,ob.fact(5));
+    }
+}
+
+
+
+pom.xml - lab
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- REQUIRED -->
+    <groupId>com.example</groupId>
+    <artifactId>simple-java-app</artifactId>
+    <version>1.0-SNAPSHOT</version>
+
+    <!-- DEPENDENCIES -->
+    <dependencies>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.9.3</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <!-- BUILD CONFIG -->
+    <build>
+        <plugins>
+
+            <!-- Java Version -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.10.1</version>
+                <configuration>
+                    <source>17</source>
+                    <target>17</target>
+                </configuration>
+            </plugin>
+
+            <!-- JUnit 5 Support -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.0.0</version>
+            </plugin>
+
+        </plugins>
+    </build>
+
+</project>
+
+
+Pipeline Script
+
+
+pipeline {
+    agent any
+    tools {
+        maven 'M3'
+    }
+    
+ stages {
+    stage('Checkout Git') {
+        steps {
+           git branch: 'master',
+           url: '<github-repo-name>'
+        }
+    }
+    
+    stage('Build and Test') {
+        steps {
+            bat 'mvn clean test'
+        }
+     }
+   }
+}
+
+
+=====================================================
+
+Jenkins-Docker-Kubernetes
+
+
+App.java
+
+public class App {
+ public static void main(String[] args) throws Exception {
+ System.out.println("Java CI/CD Application Started...");
+ while (true) {
+ Thread.sleep(5000);
+ System.out.println("Hello from Java CI/CD Pipeline!");
+ }
+ }
+}
+
+
+
+pom.xml
+
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+ xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 
+ http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+ <modelVersion>4.0.0</modelVersion>
+
+ <groupId>com.demo</groupId>
+ <artifactId>simple-java-app</artifactId>
+ <version>1.0</version>
+
+ <build>
+  <plugins>
+   <plugin>
+    <groupId>org.apache.maven.plugins</groupId>
+    <artifactId>maven-compiler-plugin</artifactId>
+    <version>3.10.1</version>
+    <configuration>
+     <source>17</source>
+     <target>17</target>
+    </configuration>
+   </plugin>
+  </plugins>
+ </build>
+
+</project>
+
+
+To build Locally : mvn clean package
+
+
+
+Dockerfile
+
+FROM eclipse-temurin:17-jdk
+WORKDIR /app
+COPY target/simple-java-app-1.0.jar app.jar
+CMD ["java", "-jar", "app.jar"]
+
+
+deployment.yaml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: java-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: java-app
+  template:
+    metadata:
+      labels:
+        app: java-app
+    spec:
+      containers:
+      - name: java-app
+        image: <dockerusername>/java-app:latest
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: java-service
+spec:
+  type: NodePort
+  selector:
+    app: java-app
+  ports:
+  - port: 80
+    targetPort: 8080
+    nodePort: 30008
+
+
+
+Pipeline Script
+
+pipeline {
+ agent any
+
+ environment {
+  DOCKER_IMAGE = "<Docker Username>/java-app:latest"
+ }
+
+ stages {
+
+  stage('Clone Repository') {
+   steps {
+    git branch: 'master',
+    url: '<your-repo-name>' //Change
+   }
+  }
+
+  stage('Build with Maven') {
+   steps {
+    bat 'mvn clean package'
+   }
+  }
+
+  stage('Build Docker Image') {
+   steps {
+    bat "docker build -t %DOCKER_IMAGE% ."
+   }
+  }
+
+  stage('Push to DockerHub') {
+   steps {
+    withCredentials([usernamePassword(
+     credentialsId: 'dockerhub-creds',
+     usernameVariable: 'DOCKER_USER',
+     passwordVariable: 'DOCKER_PASS'
+    )]) {
+     bat """
+     docker login -u %DOCKER_USER% -p %DOCKER_PASS%
+     docker push %DOCKER_IMAGE%
+     """
+    }
+   }
+  }
+
+  stage('Deploy to Kubernetes') {
+   steps {
+    bat 'kubectl apply -f deployment.yaml'
+   }
+  }
+ }
+
+ post {
+  success {
+   echo 'SUCCESS'
+  }
+ }
+}
+
+
+
+
+Manage Jenkins -> Manage Credentials -> (System) -> Global credentials (unrestricted) -> Add Credentials
+
+Kind -  Username with password
+Scope  - Global
+Username-  <docker-username>
+Password - <docker-password>
+ID - dockerhub-creds
+Description - DockerHub Login
+
+
+Click → Save → Build Now
+
+Final Output : kubectl get svc
+
+
+
+
+
+===================================================================================================
+
+
+
+index.html
+
+<!DOCTYPE html>
+<html>
+<head>
+<title>CI/CD Demo</title>
+<style>
+body{
+text-align:center;
+font-family:Times New Roman;
+background-color:#af0d0d;
+}
+h1{
+color:#0ef777;
+}
+</style>
+</head>
+<body>
+<h1>CI/CD Pipeline Working</h1>
+<h2>Deployed using Jenkins + Docker + Kubernetes</h2>
+<p>This webpage is automatically deployed using a CI/CD pipeline.</p>
+</body>
+</html>
+
+
+deployment.yaml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: html-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: html-app
+  template:
+    metadata:
+      labels:
+        app: html-app
+    spec:
+      containers:
+      - name: html-app
+        image: <dockerUsername>/html-app:latest
+        ports:
+        - containerPort : 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: html-service
+spec:
+  type: NodePort
+  selector:
+    app: html-app
+  ports:
+  - port: 80
+    targetPort: 80
+    nodePort: 30015
+
+
+Dockerfile
+
+FROM nginx:latest
+COPY index.html /usr/share/nginx/html/index.html
+EXPOSE 80
+
+
+Push to GitHub
+
+Secret File Formation
+
+New Credentials - > Kind : Secret File -> Browse .kube -> kubeconfig(check where this available in lab)
+ID : kuberconfig
+
+Manage Jenkins -> Manage Credentials -> (System) -> Global credentials (unrestricted) -> Add Credentials
+
+Kind -  Username with password
+Scope  - Global
+Username-  <your-docker-username>
+Password - <docker-password>
+ID - dockerhub-creds
+Description - DockerHub Login
+
+
+Pipeline Script
+
+
+pipeline {
+    agent any
+
+    environment {
+        DOCKER_IMAGE = "<docker-user-name>/html-app"
+    }
+
+    stages {
+
+        stage('Clone Code') {
+            steps {
+                git branch: 'master',
+                url: '<your-repo-name>'
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                bat 'docker build -t %DOCKER_IMAGE% .'
+            }
+        }
+
+        stage('Push Image') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-creds',
+                    usernameVariable: 'USER',
+                    passwordVariable: 'PASS'
+                )]) {
+                    bat '''
+                    docker login -u %USER% -p %PASS%
+                    docker push %DOCKER_IMAGE%
+                    '''
+                }
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                withCredentials([file(
+                    credentialsId: 'kuberconfig',
+                    variable: 'KUBECONFIG'
+                )]) {
+                    bat '''
+                    set KUBECONFIG=%KUBECONFIG%
+                    kubectl apply -f deployment.yaml --validate=false
+                    '''
+                }
+            }
+        }
+    }
+}
+
+
+Verifying the Service : kubectl get svc
+Port Forwarding : kubectl port-forward service/html-service 9090:80
+Local Server : http://localhost:9090
+
+kubectl get pods
+kubectl get svc
+
+If shows some other page!
+
+Delete deployment : kubectl delete deployment html-app
+Apply again : kubectl apply -f deployment.yaml
+Check pods : kubectl get pods
+Port Forwarding : kubectl port-forward service/html-service 9090:80
+
+
+
+
+=============================================================================
+
+Simple-Java-App
+- src\main\java\com\example\App.java
+-deployment.yaml
+-Dockerfile
+-pom.xml
+
+
+
+App.java
+
+package com.example;
+public class App {
+    public static void main(String[] args) throws Exception {
+        System.out.println("Java CI/CD Application Started...");
+            while (true) {
+                Thread.sleep(5000);
+                System.out.println("Hello from Java CI/CD Pipeline!");
+            }
+    }
+}
+
+deployment.yaml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: java-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: java-app
+  template:
+    metadata:
+      labels:
+        app: java-app
+    spec:
+      containers:
+      - name: java-app
+        image: thamizhkarthik05/java-app:latest
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: java-service
+spec:
+  type: NodePort
+  selector:
+    app: java-app
+  ports:
+  - port: 80
+    targetPort: 8080
+    nodePort: 30008
+
+
+
+Dockerfile
+
+FROM eclipse-temurin:17-jdk
+WORKDIR /app
+COPY target/simple-java-app-1.0.jar app.jar
+CMD ["java", "-jar", "app.jar"]
+
+
+
+
+pom.xml
+
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+ xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 
+ http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+ <modelVersion>4.0.0</modelVersion>
+
+ <groupId>com.example</groupId>
+ <artifactId>simple-java-app</artifactId>
+ <version>1.0</version>
+
+ <build>
+  <plugins>
+
+
+   <plugin>
+    <groupId>org.apache.maven.plugins</groupId>
+    <artifactId>maven-compiler-plugin</artifactId>
+    <version>3.10.1</version>
+    <configuration>
+     <source>17</source>
+     <target>17</target>
+    </configuration>
+   </plugin>
+
+
+   <plugin>
+    <groupId>org.apache.maven.plugins</groupId>
+    <artifactId>maven-jar-plugin</artifactId>
+    <version>3.3.0</version>
+    <configuration>
+     <archive>
+      <manifest>
+       <mainClass>com.example.App</mainClass>
+      </manifest>
+     </archive>
+    </configuration>
+   </plugin>
+
+  </plugins>
+ </build>
+
+</project>
+
+Local Build : mvn clean package
+Output in Terminal : java -jar target/simple-java-app-1.0.jar
+
+
+
+
+
+====================================================================================
+
+
+App.java
+
+package com.example;
+
+public class App {
+
+    // a. Addition
+    public int add(int a, int b) {
+        return a + b;
+    }
+
+    // NEW: Subtraction
+    public int subtract(int a, int b) {
+        return a - b;
+    }
+
+    // c. Multiplication
+    public int multiply(int a, int b) {
+        return a * b;
+    }
+
+    // NEW: Division
+    public int divide(int a, int b) {
+        if (b == 0) {
+            throw new ArithmeticException("Cannot divide by zero");
+        }
+        return a / b;
+    }
+
+    // b. Even or Odd
+    public String evenOdd(int n) {
+        return (n % 2 == 0) ? "Even" : "Odd";
+    }
+
+    // d. Factorial
+    public int factorial(int n) {
+        int f = 1;
+        for (int i = 1; i <= n; i++) {
+            f *= i;
+        }
+        return f;
+    }
+
+    // e. Prime Number
+    public boolean isPrime(int n) {
+        if (n <= 1) return false;
+        for (int i = 2; i <= n/2; i++) {
+            if (n % i == 0) return false;
+        }
+        return true;
+    }
+
+    // NEW: Palindrome
+    public boolean isPalindrome(String str) {
+        String rev = new StringBuilder(str).reverse().toString();
+        return str.equalsIgnoreCase(rev);
+    }
+
+    // NEW: Max Number
+    public int maxNumber(int a, int b) {
+        return (a > b) ? a : b;
+    }
+
+    // NEW: Reverse String
+    public String reverseString(String str) {
+        return new StringBuilder(str).reverse().toString();
+    }
+
+    // NEW: Temperature Converter (Celsius → Fahrenheit)
+    public double celsiusToFahrenheit(double c) {
+        return (c * 9/5) + 32;
+    }
+}
+
+
+
+
+AppTest.java
+
+package com.example;
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
+
+public class AppTest {
+
+    App app = new App();
+
+    @Test
+    void testAdd() {
+        assertEquals(5, app.add(2, 3));
+    }
+
+    @Test
+    void testSubtract() {
+        assertEquals(1, app.subtract(3, 2));
+    }
+
+    @Test
+    void testMultiply() {
+        assertEquals(6, app.multiply(2, 3));
+    }
+
+    @Test
+    void testDivide() {
+        assertEquals(2, app.divide(4, 2));
+    }
+
+    @Test
+    void testEvenOdd() {
+        assertEquals("Even", app.evenOdd(4));
+    }
+
+    @Test
+    void testFactorial() {
+        assertEquals(120, app.factorial(5));
+    }
+
+    @Test
+    void testPrime() {
+        assertTrue(app.isPrime(7));
+    }
+
+    @Test
+    void testPalindrome() {
+        assertTrue(app.isPalindrome("madam"));
+    }
+
+    @Test
+    void testMaxNumber() {
+        assertEquals(10, app.maxNumber(10, 5));
+    }
+
+    @Test
+    void testReverseString() {
+        assertEquals("olleh", app.reverseString("hello"));
+    }
+
+    @Test
+    void testTemperature() {
+        assertEquals(98.6, app.celsiusToFahrenheit(37), 0.1);
+    }
+}
+
+
+DockerFile 
+
+FROM eclipse-temurin:17-jdk
+COPY target/simple-java-app-1.0.jar app.jar
+CMD ["java", "-jar", "app.jar"]
+
+pom.xml
+
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+ xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 
+ http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+ <modelVersion>4.0.0</modelVersion>
+
+ <groupId>com.example</groupId>
+ <artifactId>simple-java-app</artifactId>
+ <version>1.0</version>
+
+ <dependencies>
+  <dependency>
+   <groupId>org.junit.jupiter</groupId>
+   <artifactId>junit-jupiter</artifactId>
+   <version>5.9.3</version>
+   <scope>test</scope>
+  </dependency>
+ </dependencies>
+
+ <build>
+  <plugins>
+   <plugin>
+    <groupId>org.apache.maven.plugins</groupId>
+    <artifactId>maven-compiler-plugin</artifactId>
+    <version>3.10.1</version>
+    <configuration>
+     <source>17</source>
+     <target>17</target>
+    </configuration>
+   </plugin>
+  </plugins>
+ </build>
+
+</project>
+
+Pipeline Script
+
+pipeline {
+    agent any
+
+    stages {
+
+        stage('Clone Code') {
+            steps {
+                git branch: 'master',
+                url: 'https://github.com/23MIS0050/Simple-Maven-App.git'
+            }
+        }
+
+        stage('Build') {
+            steps {
+                bat 'mvn clean compile'
+            }
+        }
+
+        stage('Test') {
+            steps {
+                bat 'mvn test'
+            }
+        }
+
+        stage('Package') {
+            steps {
+                bat 'mvn package'
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                bat 'docker build -t java-app .'
+            }
+        }
+    }
+}
+
+
+
+
+
+
+
+
